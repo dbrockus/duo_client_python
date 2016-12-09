@@ -26,6 +26,29 @@ Note: USER_STATUS_LOCKED_OUT can only be set by the system. You cannot
       set a user to be in the USER_STATUS_LOCKED_OUT state.
 
 
+ENDPOINTS
+
+Endpoint objects are returned in the following format:
+
+    {"username": <str:username>,
+     "email": <str:email>,
+     "epkey": <str:epkey>,
+     "os family": <str:os family>,
+     "os version": <str:os version>,
+     "model": <str:model>,
+     "type": <str:type>,
+     "browsers": [<browser object, ...]}
+
+
+BROWSERS
+
+Browser objects are returned in the following format:
+    {"browser family": <str:browser family>,
+     "browser version": <str:browser version>,
+     "flash version": <str: flash version>,
+     "java version": <str: java version>}
+
+
 PHONES
 
 Phone objects are returned in the following format:
@@ -226,13 +249,19 @@ class Admin(client.Client):
                 {'timestamp': <int:unix timestamp>,
                  'eventtype': "authentication",
                  'host': <str:host>,
+                 'device': <str:device>,
                  'username': <str:username>,
                  'factor': <str:factor>,
                  'result': <str:result>,
                  'ip': <str:ip address>,
                  'new_enrollment': <bool:if event corresponds to enrollment>,
-                 'integration': <str:integration>}, ...
-            ]
+                 'integration': <str:integration>,
+                 'location': {
+                     'state': '<str:state>',
+                     'city': '<str:city>',
+                     'country': '<str:country>'
+                 }
+             }]
 
         Raises RuntimeError on error.
         """
@@ -621,6 +650,15 @@ class Admin(client.Client):
         path = '/admin/v1/users/' + user_id + '/groups/' + group_id
         params = {}
         return self.json_api_call('DELETE', path, params)
+
+    def get_endpoints(self):
+        """
+        Returns list of endpoints.
+
+        Raises RuntimeError on error.
+        """
+        response = self.json_api_call('GET', '/admin/v1/endpoints', {})
+        return response
 
     def get_phones(self):
         """
@@ -1212,7 +1250,9 @@ class Admin(client.Client):
                         password_requires_upper_alpha=None,
                         password_requires_lower_alpha=None,
                         password_requires_numeric=None,
-                        password_requires_special=None):
+                        password_requires_special=None,
+                        helpdesk_bypass=None,
+                        helpdesk_bypass_expiration=None):
         """
         Update settings.
 
@@ -1242,6 +1282,9 @@ class Admin(client.Client):
         password_requires_lower_alpha = True|False|None
         password_requires_numeric = True|False|None
         password_requires_special = True|False|None
+        helpdesk_bypass - "allow"|"limit"|None
+        helpdesk_bypass_expiration - <int:minutes>|0
+
 
         Returns updated settings object.
 
@@ -1305,6 +1348,10 @@ class Admin(client.Client):
         if password_requires_special is not None:
             params['password_requires_special'] = ('1' if
               password_requires_special else '0')
+        if helpdesk_bypass is not None:
+            params['helpdesk_bypass'] = str(helpdesk_bypass)
+        if helpdesk_bypass_expiration is not None:
+            params['helpdesk_bypass_expiration'] = str(helpdesk_bypass_expiration)
 
         if not params:
             raise TypeError("No settings were provided")
@@ -1836,14 +1883,15 @@ class Admin(client.Client):
         return response
 
 
-    def add_admin(self, name, email, phone, password):
+    def add_admin(self, name, email, phone, password, role=None):
         """
         Create an administrator and adds it to a customer.
 
         name - <str:the name of the administrator>
         email - <str:email address>
         phone - <str:phone number>
-        password - <str:pasword>
+        password - <str:password>
+        role - <str|None:role>
 
         Returns the added administrator.  See the adminapi docs.
 
@@ -1858,6 +1906,8 @@ class Admin(client.Client):
             params['phone'] = phone
         if password is not None:
             params['password'] = password
+        if role is not None:
+            params['role'] = role
         response = self.json_api_call('POST', '/admin/v1/admins', params)
         return response
 
